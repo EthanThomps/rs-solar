@@ -2,8 +2,8 @@
 mod tests {
     use rust_solar::{
         julian::jd2greg,
-        kepler::Body,
-        planets::mars::Mars,
+        kepler::{Body, TimeZone},
+        planets::mars::{Mars, Martian},
     };
 
     #[test]
@@ -14,4 +14,12 @@ mod tests {
         println!("The date is {:?}", date);
     }
 
+    #[test]
+    pub fn mars_to_time() {
+        let time = Martian::MTCp5.new();
+
+        println!("Time now: {:?}", time);
+    }
+
 }
+

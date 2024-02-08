@@ -1,9 +1,14 @@
+use std::time::UNIX_EPOCH;
+
 use crate::{
-    kepler::{ Body, Date, Time, TimeZone},
+    julian::JD2NOON,
+    kepler::{Body, Date, HourType, Time, TimeZone},
     orbit::{MeanMotion, Perihelion, SemiAxis},
 };
 use displaydoc::Display;
 use strum::{AsRefStr, EnumProperty};
+
+use super::EARTH_ROTATIONAL_PERIOD;
 
 #[derive(Debug, Copy, Clone)]
 /// This structure represents the fourth planet from the sun
@@ -15,10 +20,10 @@ pub struct Mars;
 /// Offset is in 1 decisol, (-2.5 west, +2.5 east)
 ///
 /// There is no DST on mars
-/// 
+///
 /// 1 sol = 25 hours
 /// 1 decisol = 2.5 hours
-/// 
+///
 /// 12.5 + 12.5 = 25
 /// MTC-5 to MTC+5 is 25 hours
 pub enum Martian {
@@ -56,7 +61,7 @@ pub enum Martian {
         East = "-90",
         West = "-54"
     ))]
-        /// Mars Coordinated Time - 2
+    /// Mars Coordinated Time - 2
     MTCn2,
     #[strum(props(
         Code = "AGT",
@@ -185,9 +190,62 @@ impl Body for Mars {
 }
 
 impl TimeZone for Martian {
+    /// Body Earth Ratio
+    ///
+    /// * body_rotational_period / earth_rotational_period
+    ///
+    /// Body Moon Ratio
+    ///
+    /// * moon_rotational_period / body_rotational_period (host planet of the exact moon)
+    ///
     fn new(&self) -> Time {
-        
-        todo!()
-    }
+        let millis = std::time::SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Unix Epoch to function")
+            .as_millis() as f64;
 
+        let jd_ut = 2_440_587.5 + (millis / EARTH_ROTATIONAL_PERIOD * 1000.0);
+        let jd_tt = jd_ut + (37.0 + 32.184) / EARTH_ROTATIONAL_PERIOD;
+        let jd2000_t = jd_tt - JD2NOON;
+        let mars_earth_ratio = 1.027491252_f64;
+        let midday = 44_796.0_f64;
+        let alignment = 0.00096_f64;
+        let msx0 = jd2000_t - 4.5;
+        let msd = (msx0 / mars_earth_ratio) + midday - alignment;
+        // let mtc = (24.0 * msd) % 24.0;
+        let fh = msd.fract(); // Fractional Hour
+        let mut hour = (24.0 * fh).floor();
+        let fm = (24.0 * fh).fract();
+        let minute = (60.0 * fm).floor();
+        let second = 60.0 * (60.0 * fm).fract();
+        let hour_type = HourType::default().new(
+            hour as u8
+                + self
+                    .get_str("Offset")
+                    .unwrap()
+                    .parse::<f64>()
+                    .expect("Offset to be established") as u8,
+        );
+
+        match hour as u8 > 24 {
+            true => hour = 0.0,
+            false => (),
+        }
+
+        println!(
+            "East: {:?}, West: {:?}",
+            self.get_str("East").unwrap(),
+            self.get_str("West").unwrap()
+        );
+        
+        Time {
+            hour: hour as i32,
+            minute: minute as u8,
+            second: second as u8,
+            code: self.get_str("Code").unwrap().to_string(),
+            name: self.get_str("Name").unwrap().to_string(),
+            offset_name: self.as_ref().to_string(),
+            hour_type: hour_type,
+        }
+    }
 }

@@ -149,15 +149,19 @@ impl Date {
 /// This is a collection of what a time should consist of
 pub struct Time {
     /// This is the hour of the body
-    pub hour: f64,
+    pub hour: i32,
     /// This is the minute of the body
-    pub minute: f64,
+    pub minute: u8,
     /// This is the second of the body
-    pub second: f64,
-    /// This is the offset of the body
-    pub offset: String,
+    pub second: u8,
+    /// This is the offset code of the body
+    pub code: String,   
+    /// This is the name code of the body
+    pub name: String,
+    /// This is the offset name code of the body
+    pub offset_name: String,
     /// This is the hour type of body (Millitary Time or 12Hour)
-    pub hour_type: HourType,
+    pub hour_type: String,
 }
 
 impl Time {
