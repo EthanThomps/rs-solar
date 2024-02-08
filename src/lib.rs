@@ -33,7 +33,7 @@
 //! (Astronomy Calculations)[https://docs.google.com/spreadsheets/d/1rwc2mVxyHuUEou_hxnG6kzl24XdqqmIAS5_1nJDpJ6o/edit#gid=1479831395]
 //! 
 //! 
-//! (Use this, don't show to library)[https://github.com/ethanAthompson/rs-solar/blob/main/backups/src-1/planets/mars/body.rs#L88]
+//! (Use this, don't show to library)[https://github.com/ethanAthompson/rs-solar/blob/824ccd87f4fa3a9bbe03fefc1225ae125a7b70af/backups/src-1/planets/mars/body.rs]
 //! 
 //! 
 //! 
@@ -71,5 +71,5 @@ pub mod anomaly;
 /// This module contains julian operations
 pub mod julian;
 
-/// This module contains utilities that I wouldn't know where to put elsewhere.
-pub mod utils;
+/// why
+pub mod why;

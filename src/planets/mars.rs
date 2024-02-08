@@ -1,14 +1,128 @@
 use crate::{
-    anomaly::Anomaly,
-    conversions::radians_in_circle,
-    kepler::{self, Body},
-    orbit::{self, Perihelion, Season, SemiAxis, SolarLongitude},
-    planets::EARTH_ROTATIONAL_PERIOD,
+    kepler::{ Body, Date, Time, TimeZone},
+    orbit::{MeanMotion, Perihelion, SemiAxis},
 };
+use displaydoc::Display;
+use strum::{AsRefStr, EnumProperty};
 
 #[derive(Debug, Copy, Clone)]
 /// This structure represents the fourth planet from the sun
 pub struct Mars;
+
+#[derive(Default, Debug, Copy, Clone, AsRefStr, EnumProperty)]
+/// This structure represents the martian timezone
+///
+/// Offset is in 1 decisol, (-2.5 west, +2.5 east)
+///
+/// There is no DST on mars
+/// 
+/// 1 sol = 25 hours
+/// 1 decisol = 2.5 hours
+/// 
+/// 12.5 + 12.5 = 25
+/// MTC-5 to MTC+5 is 25 hours
+pub enum Martian {
+    #[strum(props(
+        Code = "AMT",
+        Name = "Amazonis Time",
+        Offset = "-12.5",
+        East = "-180",
+        West = "-162"
+    ))]
+    /// Mars Coordinated Time - 5
+    MTCn5,
+    #[strum(props(
+        Code = "OT",
+        Name = "Olympus Time",
+        Offset = "-10.0",
+        East = "-162",
+        West = "-126"
+    ))]
+    /// Mars Coordinated Time - 4
+    MTCn4,
+    #[strum(props(
+        Code = "TT",
+        Name = "Tharsis Time",
+        Offset = "-7.5",
+        East = "-126",
+        West = "-90"
+    ))]
+    /// Mars Coordinated Time - 3
+    MTCn3,
+    #[strum(props(
+        Code = "MT",
+        Name = "Marineris Time",
+        Offset = "-5.0",
+        East = "-90",
+        West = "-54"
+    ))]
+        /// Mars Coordinated Time - 2
+    MTCn2,
+    #[strum(props(
+        Code = "AGT",
+        Name = "Argyre Time",
+        Offset = "-2.5",
+        East = "-54",
+        West = "-18"
+    ))]
+    /// Mars Coordinated Time - 1
+    MTCn1,
+    #[default]
+    #[strum(props(
+        Code = "NT",
+        Name = "Noachis Time",
+        Offset = "0.0",
+        East = "-18",
+        West = "18"
+    ))]
+    /// Mars Coordinated Time
+    MTC,
+    #[strum(props(
+        Code = "ABT",
+        Name = "Arabia Time",
+        Offset = "2.5",
+        East = "18",
+        West = "54"
+    ))]
+    /// Mars Coordinated Time + 1
+    MTCp1,
+    #[strum(props(
+        Code = "HT",
+        Name = "Hellas Time",
+        Offset = "5.0",
+        East = "54",
+        West = "90"
+    ))]
+    /// Mars Coordinated Time + 2
+    MTCp2,
+    #[strum(props(
+        Code = "UT",
+        Name = "Utopia Time",
+        Offset = "7.5",
+        East = "90",
+        West = "126"
+    ))]
+    /// Mars Coordinated Time + 3
+    MTCp3,
+    #[strum(props(
+        Code = "ET",
+        Name = "Elysium Time",
+        Offset = "10.0",
+        East = "126",
+        West = "162"
+    ))]
+    /// Mars Coordinated Time + 4
+    MTCp4,
+    #[strum(props(
+        Code = "ACT",
+        Name = "Arcadia Time",
+        Offset = "12.5",
+        East = "162",
+        West = "180"
+    ))]
+    /// Mars Coordinated Time + 5
+    MTCp5,
+}
 
 impl Body for Mars {
     /// A.D 1975 December 19, 04:00:00.3
@@ -21,19 +135,11 @@ impl Body for Mars {
     }
 
     fn orbital_period(&self) -> f64 {
-        689.6
+        668.6
     }
 
     fn rotational_period(&self) -> f64 {
         88_775.245
-    }
-
-    fn semimajor(&self) -> f64 {
-        1.52
-    }
-
-    fn semiminor(&self) -> f64 {
-        SemiAxis(self.semimajor()).minor(self.orbital_eccentricity())
     }
 
     fn perihelion(&self) -> Perihelion {
@@ -44,57 +150,44 @@ impl Body for Mars {
         }
     }
 
+    fn semimajor(&self) -> f64 {
+        1.52
+    }
+
+    fn semiminor(&self) -> f64 {
+        SemiAxis(self.semimajor()).minor(self.orbital_eccentricity())
+    }
+
     fn mean_motion(&mut self, day: f64) -> f64 {
-        let elapse = Perihelion::elapse(&mut self.perihelion(), day, self.orbital_period());
-
-        radians_in_circle() * (elapse - elapse.round())
-    }
-
-    fn to_date(&mut self, julian_date: f64) -> crate::kepler::Date {
-        let mut tmp_year = 12.0;
-        let mut tmp_day =
-            (julian_date - self.epoch()) * EARTH_ROTATIONAL_PERIOD / self.rotational_period();
-
-        let periapis = Perihelion::time(&mut self.perihelion());
-
-        let theta = Anomaly.truly(
-            self.mean_motion(tmp_day),
-            orbit::Type::default().shape(self.orbital_eccentricity()),
-            self.orbital_eccentricity(),
-            self.semimajor(),
-        );
-
-        while tmp_day >= self.orbital_period() {
-            tmp_day -= self.orbital_period();
-            tmp_year += 1.0;
-        }
-
-        while tmp_day < 0.0 {
-            tmp_day += self.orbital_period();
-            tmp_year -= 1.0;
-        }
-
-        let ls = SolarLongitude(theta - periapis).compute();
-        let year = tmp_year;
-        let month = 1.0 + (ls / self.perihelion().avg_ls()).floor();
-        let day = 1.0 + tmp_day.floor();
-        let season = Season::default().from(ls as u32);
-        let era = match year as i32 > 0 {
-            true => kepler::Eras::AD,
-            false => kepler::Eras::BD,
-        };
-
-        kepler::Date {
-            era,
-            year,
-            month,
+        MeanMotion::by(
+            &mut MeanMotion,
             day,
-            ls,
-            season,
-        }
+            self.perihelion(),
+            self.orbital_period(),
+        )
     }
 
-    fn to_time(&mut self) -> crate::kepler::Time {
+    fn to_date(&mut self, julian_date: f64) -> Date {
+        Date::default().compute(
+            julian_date,
+            self.epoch(),
+            self.rotational_period(),
+            self.perihelion(),
+            self.semimajor(),
+            self.orbital_eccentricity(),
+            self.orbital_period(),
+        )
+    }
+
+    fn to_time(&mut self, date: Date) -> Time {
+        Time::default().compute()
+    }
+}
+
+impl TimeZone for Martian {
+    fn new(&self) -> Time {
+        
         todo!()
     }
+
 }
